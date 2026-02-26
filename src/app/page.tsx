@@ -1,64 +1,115 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Sparkles, Copy, Check, Loader2, Linkedin } from "lucide-react";
 
 export default function Home() {
+  const [sourceText, setSourceText] = useState("");
+  const [tone, setTone] = useState("professional");
+  const [generatedPost, setGeneratedPost] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const handleGenerate = async () => {
+    setIsLoading(true);
+    setGeneratedPost("");
+    setProgress(10);
+    
+    try {
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          body: JSON.stringify({ sourceText, tone }),
+        });
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        setProgress(40);
+
+        while (true) {
+          const { done, value } = await reader!.read();
+          if (done) break;
+          setGeneratedPost((prev) => prev + decoder.decode(value));
+          setProgress((prev) => Math.min(prev + 1, 95));
+        }
+        setProgress(100);
+    } catch (e) {
+        console.error("Error", e);
+    } finally {
+        setIsLoading(false);
+        setTimeout(() => setProgress(0), 500);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(generatedPost);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-black text-white p-4 md:p-12">
+      <main className="max-w-2xl mx-auto space-y-8">
+        <div className="flex items-center gap-2">
+          <div className="bg-[#0077b5] p-1.5 rounded">
+            <Linkedin className="text-white w-6 h-6" />
+          </div>
+          <h1 className="text-xl font-bold">LinkedPost AI</h1>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        <Card className="bg-zinc-900 border-zinc-800 relative overflow-hidden">
+          {progress > 0 && (
+            <Progress value={progress} className="absolute top-0 left-0 right-0 h-1 bg-transparent text-blue-600" />
+          )}
+          <CardContent className="p-6 space-y-4">
+            <Textarea 
+              placeholder="Вставте ідею або текст..."
+              className="bg-black border-zinc-700 text-white min-h-[150px] focus:ring-blue-500"
+              value={sourceText}
+              onChange={(e) => setSourceText(e.target.value)}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            
+            <div className="flex gap-2">
+              {['professional', 'creative', 'bold'].map((t) => (
+                <Button 
+                  key={t}
+                  variant={tone === t ? "default" : "outline"}
+                  onClick={() => setTone(t)}
+                  className={`capitalize ${tone === t ? "bg-blue-600" : "border-zinc-700 text-zinc-400"}`}
+                >
+                  {t}
+                </Button>
+              ))}
+            </div>
+
+            <Button 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12" 
+              onClick={handleGenerate}
+              disabled={isLoading || !sourceText}
+            >
+              {isLoading ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              Згенерувати пост
+            </Button>
+          </CardContent>
+        </Card>
+
+        {generatedPost && (
+          <Card className="bg-zinc-900 border-zinc-800 animate-in fade-in duration-700">
+            <CardHeader className="flex flex-row items-center justify-between py-3">
+              <span className="text-xs font-medium text-zinc-500 uppercase">Результат</span>
+              <Button size="sm" variant="ghost" onClick={copyToClipboard}>
+                {isCopied ? <Check className="text-green-500 w-4 h-4" /> : <Copy className="w-4 h-4 text-zinc-400" />}
+              </Button>
+            </CardHeader>
+            <CardContent className="whitespace-pre-wrap text-zinc-200 leading-relaxed border-t border-zinc-800 pt-4">
+              {generatedPost}
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );
